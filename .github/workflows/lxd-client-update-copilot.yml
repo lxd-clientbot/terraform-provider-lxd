@@ -1,4 +1,4 @@
-name: LXD Client Update
+name: LXD Client Update Copilit
 
 on:
   repository_dispatch:
