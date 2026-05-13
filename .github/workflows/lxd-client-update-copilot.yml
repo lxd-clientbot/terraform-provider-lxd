@@ -93,6 +93,8 @@ jobs:
           python-version: '3.12'
 
       - name: Install GitHub Copilot CLI
+        env:
+          GH_TOKEN: ${{ secrets.PR_OPEN_TOKEN }}
         run: |
           gh extension install github/gh-copilot
 
