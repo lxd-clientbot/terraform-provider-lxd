@@ -97,9 +97,19 @@ jobs:
         run: pip install --quiet requests
 
       - name: Update LXD dependency
+        env:
+          LXD_REPO: ${{ steps.inputs.outputs.repository }}
         run: |
-          echo "Updating ${LXD_MODULE} to main"
-          go get "${LXD_MODULE}@main"
+          if [ "${LXD_REPO}" = "canonical/lxd" ]; then
+            # Production: fetch latest main from the canonical module.
+            echo "Updating ${LXD_MODULE} to main"
+            go get "${LXD_MODULE}@main"
+          else
+            # Fork-based testing: use a replace directive to redirect the
+            # module to the fork, since Go resolves by module path.
+            echo "Updating ${LXD_MODULE} via replace -> github.com/${LXD_REPO}@main"
+            go mod edit -replace "${LXD_MODULE}=github.com/${LXD_REPO}@main"
+          fi
           go mod tidy
 
       - name: Initial build check
