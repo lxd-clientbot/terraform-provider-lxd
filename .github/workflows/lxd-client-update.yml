@@ -73,11 +73,9 @@ jobs:
           go-version-file: 'go.mod'
 
       - name: Update LXD dependency
-        env:
-          LXD_SHA: ${{ steps.inputs.outputs.sha }}
         run: |
-          echo "Updating ${LXD_MODULE} to ${LXD_SHA}"
-          go get "${LXD_MODULE}@${LXD_SHA}"
+          echo "Updating ${LXD_MODULE} to main"
+          go get "${LXD_MODULE}@main"
           go mod tidy
 
       - name: Create branch and commit
