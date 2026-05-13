@@ -154,6 +154,7 @@ jobs:
         if: steps.build.outputs.result == 'failure'
         id: ai-fix
         env:
+          PYTHONUNBUFFERED: "1"
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           OPENROUTER_MODEL: ${{ steps.inputs.outputs.model }}
           BUILD_ERRORS_FILE: build-errors.txt
