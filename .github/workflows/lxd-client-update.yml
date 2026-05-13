@@ -106,7 +106,7 @@ jobs:
 
           Co-authored-by: Canonical LXD Bot <lxd@lists.canonical.com>"
 
-          git push origin "${BRANCH}"
+          git push origin "${BRANCH}" --force
 
       - name: Open draft PR
         if: steps.branch.outputs.has_changes == 'true'
