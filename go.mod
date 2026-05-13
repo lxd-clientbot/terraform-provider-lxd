@@ -93,3 +93,5 @@ require (
 	google.golang.org/protobuf v1.36.11 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
+
+replace github.com/canonical/lxd => github.com/lxd-clientbot/lxd v0.0.0-20260410132535-4c50a3ce3a71
