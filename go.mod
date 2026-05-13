@@ -3,7 +3,7 @@ module github.com/terraform-lxd/terraform-provider-lxd
 go 1.26.2
 
 require (
-	github.com/canonical/lxd v0.0.0-20260410132535-4c50a3ce3a71
+	github.com/canonical/lxd v0.0.0-20260513055015-096f26663845
 	github.com/dustinkirkland/golang-petname v0.0.0-20260215035315-f0c533e9ce9b
 	github.com/hashicorp/go-version v1.9.0
 	github.com/hashicorp/terraform-plugin-framework v1.19.0
