@@ -196,6 +196,8 @@ func run() int {
 			continue
 		}
 
+		fmt.Println("\nDiff to apply:")
+		fmt.Println(diff)
 		fmt.Println("\nApplying diff...")
 		modified, err := applyDiff(diff)
 		if err != nil {
@@ -477,31 +479,33 @@ func applyDiff(diff string) ([]string, error) {
 
 	tmpFile.Close()
 
-	// Try git apply with --verbose to see which files are modified.
-	cmd := exec.Command("git", "apply", "--verbose", tmpFile.Name())
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-
-	if err := cmd.Run(); err != nil {
-		// If strict apply fails, try with --3way for better conflict handling,
-		// or --unidiff-zero for zero-context diffs.
-		fmt.Printf("  ⚠ git apply failed, retrying with --unidiff-zero: %s\n", stderr.String())
-
-		cmd2 := exec.Command("git", "apply", "--verbose", "--unidiff-zero", tmpFile.Name())
-		stdout.Reset()
-		stderr.Reset()
-		cmd2.Stdout = &stdout
-		cmd2.Stderr = &stderr
-
-		if err := cmd2.Run(); err != nil {
-			return nil, fmt.Errorf("git apply failed: %s", stderr.String())
-		}
+	// Try increasingly lenient git apply strategies.
+	strategies := []struct {
+		name string
+		args []string
+	}{
+		{"strict", []string{"git", "apply", "--verbose", tmpFile.Name()}},
+		{"ignore-whitespace", []string{"git", "apply", "--verbose", "--ignore-whitespace", tmpFile.Name()}},
+		{"unidiff-zero", []string{"git", "apply", "--verbose", "--unidiff-zero", "--ignore-whitespace", tmpFile.Name()}},
 	}
 
-	// Extract modified file paths from the diff itself.
-	modified := extractDiffFiles(diff)
-	return modified, nil
+	var lastErr string
+	for _, s := range strategies {
+		cmd := exec.Command(s.args[0], s.args[1:]...)
+		var stderr bytes.Buffer
+		cmd.Stderr = &stderr
+
+		if err := cmd.Run(); err != nil {
+			lastErr = stderr.String()
+			fmt.Printf("  ⚠ git apply (%s) failed: %s\n", s.name, lastErr)
+			continue
+		}
+
+		fmt.Printf("  ✓ Patch applied successfully (%s)\n", s.name)
+		return extractDiffFiles(diff), nil
+	}
+
+	return nil, fmt.Errorf("all git apply strategies failed. Last error: %s", lastErr)
 }
 
 // extractDiffFiles parses a unified diff to find the file paths being modified.
