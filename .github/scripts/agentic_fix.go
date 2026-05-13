@@ -51,26 +51,22 @@ Rules:
 5. If a type gained or lost fields, update struct literals accordingly.
 6. Do not add new features or change test logic.
 
-Respond with ONLY a JSON array of file edits. Each element must have:
-- "file": the relative file path (e.g. "internal/network/resource_network.go")
-- "content": the complete updated file content
+Respond with ONLY a unified diff that can be applied with "git apply". The diff must:
+- Use the standard unified diff format (--- a/file, +++ b/file, @@ hunks)
+- Include correct line numbers in the @@ hunk headers
+- Include enough context lines (at least 3) for unambiguous matching
+- Cover ALL files that need changes
 
 Example response format:
-[
-  {
-    "file": "internal/network/resource_network.go",
-    "content": "package network\n\nimport (...)\n..."
-  }
-]
+--- a/internal/instance/resource_instance.go
++++ b/internal/instance/resource_instance.go
+@@ -204,7 +204,7 @@
+ 	// some context
+-	old line
++	new line
+ 	// more context
 
-If no changes are needed for a file, omit it from the array.
-Return ONLY the JSON array — no markdown fences, no explanation.`
-
-// fileEdit represents a single file modification returned by the AI.
-type fileEdit struct {
-	File    string `json:"file"`
-	Content string `json:"content"`
-}
+Return ONLY the unified diff — no markdown fences, no explanation.`
 
 // chatMessage represents an OpenRouter chat message.
 type chatMessage struct {
@@ -193,19 +189,32 @@ func run() int {
 		// Add AI response to conversation history.
 		messages = append(messages, chatMessage{Role: "assistant", Content: response})
 
-		edits := parseFileEdits(response)
-		if len(edits) == 0 {
-			fmt.Println("  ✗ No valid edits returned by AI.")
-			summaryParts = append(summaryParts, fmt.Sprintf("### Iteration %d\n- No valid edits returned\n", iteration))
+		diff := cleanDiff(response)
+		if diff == "" {
+			fmt.Println("  ✗ No valid diff returned by AI.")
+			summaryParts = append(summaryParts, fmt.Sprintf("### Iteration %d\n- No valid diff returned\n", iteration))
 			continue
 		}
 
-		fmt.Printf("\nApplying %d edit(s):\n", len(edits))
-		modified := applyEdits(edits)
+		fmt.Println("\nApplying diff...")
+		modified, err := applyDiff(diff)
+		if err != nil {
+			fmt.Printf("  ✗ Failed to apply diff: %v\n", err)
+			summaryParts = append(summaryParts, fmt.Sprintf("### Iteration %d\n- Failed to apply diff: %v\n", iteration, err))
+
+			// Tell the AI the diff failed so it can adjust.
+			messages = append(messages, chatMessage{
+				Role:    "user",
+				Content: fmt.Sprintf("The diff you provided failed to apply with error:\n%v\n\nPlease provide a corrected unified diff.", err),
+			})
+			continue
+		}
+
 		for _, f := range modified {
 			allModified[f] = true
 		}
 
+		fmt.Printf("  ✓ Modified files: %s\n", strings.Join(modified, ", "))
 		summaryParts = append(summaryParts, fmt.Sprintf("### Iteration %d\n- Modified: %s\n", iteration, strings.Join(modified, ", ")))
 
 		fmt.Println("\nRebuilding...")
@@ -421,66 +430,97 @@ func buildUserPrompt(buildErrors, lxdDiff string, affectedFiles []string, iterat
 		fmt.Fprintf(&b, "\n### %s\n```go\n%s\n```\n", fp, content)
 	}
 
-	b.WriteString("\nFix the build errors above. Return ONLY a JSON array of file edits.")
+	b.WriteString("\nFix the build errors above. Return ONLY a unified diff (git diff format).")
 
 	return b.String()
 }
 
-// parseFileEdits extracts file edits from an AI response. Handles optional
-// markdown code fences around the JSON.
-func parseFileEdits(response string) []fileEdit {
+// cleanDiff strips markdown code fences from the AI response and validates
+// that the result looks like a unified diff.
+func cleanDiff(response string) string {
 	cleaned := strings.TrimSpace(response)
 
 	// Strip markdown code fences if present.
-	cleaned = regexp.MustCompile(`(?s)^` + "```" + `(?:json)?\s*\n?`).ReplaceAllString(cleaned, "")
+	cleaned = regexp.MustCompile(`(?s)^` + "```" + `(?:diff|patch)?\s*\n?`).ReplaceAllString(cleaned, "")
 	cleaned = regexp.MustCompile(`(?s)\n?` + "```" + `\s*$`).ReplaceAllString(cleaned, "")
 	cleaned = strings.TrimSpace(cleaned)
 
-	var edits []fileEdit
-	if err := json.Unmarshal([]byte(cleaned), &edits); err != nil {
-		fmt.Printf("  ✗ Failed to parse AI response as JSON: %v\n", err)
+	// Sanity check: a valid diff should contain at least one hunk header.
+	if !strings.Contains(cleaned, "@@") {
+		fmt.Println("  ⚠ Response does not appear to contain a unified diff.")
 		preview := cleaned
 		if len(preview) > 500 {
 			preview = preview[:500]
 		}
 
 		fmt.Printf("  Response preview: %s\n", preview)
-		return nil
+		return ""
 	}
 
-	var valid []fileEdit
-	for _, e := range edits {
-		if e.File == "" || e.Content == "" {
-			fmt.Printf("  ✗ Skipping malformed edit entry (empty file or content)\n")
-			continue
-		}
-
-		valid = append(valid, e)
-	}
-
-	return valid
+	return cleaned
 }
 
-// applyEdits writes file edits to disk and returns the list of modified paths.
-func applyEdits(edits []fileEdit) []string {
-	var modified []string
-
-	for _, edit := range edits {
-		if _, err := os.Stat(edit.File); os.IsNotExist(err) {
-			fmt.Printf("  ⚠ Skipping non-existent file: %s\n", edit.File)
-			continue
-		}
-
-		if err := writeFile(edit.File, edit.Content); err != nil {
-			fmt.Printf("  ✗ Failed to write %s: %v\n", edit.File, err)
-			continue
-		}
-
-		modified = append(modified, edit.File)
-		fmt.Printf("  ✓ Updated %s\n", edit.File)
+// applyDiff writes the diff to a temporary file and applies it using git apply.
+// Returns the list of modified file paths.
+func applyDiff(diff string) ([]string, error) {
+	tmpFile, err := os.CreateTemp("", "ai-fix-*.patch")
+	if err != nil {
+		return nil, fmt.Errorf("create temp file: %w", err)
 	}
 
-	return modified
+	defer os.Remove(tmpFile.Name())
+
+	if _, err := tmpFile.WriteString(diff); err != nil {
+		tmpFile.Close()
+		return nil, fmt.Errorf("write patch: %w", err)
+	}
+
+	tmpFile.Close()
+
+	// Try git apply with --verbose to see which files are modified.
+	cmd := exec.Command("git", "apply", "--verbose", tmpFile.Name())
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	if err := cmd.Run(); err != nil {
+		// If strict apply fails, try with --3way for better conflict handling,
+		// or --unidiff-zero for zero-context diffs.
+		fmt.Printf("  ⚠ git apply failed, retrying with --unidiff-zero: %s\n", stderr.String())
+
+		cmd2 := exec.Command("git", "apply", "--verbose", "--unidiff-zero", tmpFile.Name())
+		stdout.Reset()
+		stderr.Reset()
+		cmd2.Stdout = &stdout
+		cmd2.Stderr = &stderr
+
+		if err := cmd2.Run(); err != nil {
+			return nil, fmt.Errorf("git apply failed: %s", stderr.String())
+		}
+	}
+
+	// Extract modified file paths from the diff itself.
+	modified := extractDiffFiles(diff)
+	return modified, nil
+}
+
+// extractDiffFiles parses a unified diff to find the file paths being modified.
+func extractDiffFiles(diff string) []string {
+	pattern := regexp.MustCompile(`(?m)^\+\+\+ b/(.+)$`)
+	matches := pattern.FindAllStringSubmatch(diff, -1)
+
+	seen := make(map[string]bool)
+	var files []string
+
+	for _, m := range matches {
+		fp := m[1]
+		if !seen[fp] {
+			seen[fp] = true
+			files = append(files, fp)
+		}
+	}
+
+	return files
 }
 
 // readFile reads a file and returns its content.
