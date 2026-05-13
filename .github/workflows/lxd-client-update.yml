@@ -56,11 +56,11 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.PR_OPEN_TOKEN }}
 
       - name: Configure Git
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.PR_OPEN_TOKEN }}
           REPO: ${{ github.repository }}
         run: |
           git config user.name "Canonical LXD Bot"
@@ -111,7 +111,7 @@ jobs:
       - name: Open draft PR
         if: steps.branch.outputs.has_changes == 'true'
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.PR_OPEN_TOKEN }}
           BRANCH_NAME: ${{ steps.branch.outputs.name }}
           SHA_SHORT: ${{ steps.inputs.outputs.sha_short }}
           LXD_SHA: ${{ steps.inputs.outputs.sha }}
