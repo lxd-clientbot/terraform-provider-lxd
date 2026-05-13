@@ -1,4 +1,4 @@
-name: LXD Client Update Copilit
+name: LXD Client Update Copilot
 
 on:
   repository_dispatch:
@@ -20,7 +20,7 @@ permissions:
   pull-requests: write
 
 concurrency:
-  group: lxd-client-update
+  group: lxd-client-update-copilot
   cancel-in-progress: true
 
 env:
