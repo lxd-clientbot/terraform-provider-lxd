@@ -207,6 +207,8 @@ jobs:
           BUILD_RESULT: ${{ steps.build.outputs.result }}
           AI_RESULT: ${{ steps.ai-fix.outputs.result }}
         run: |
+          set -euo pipefail
+
           EXISTING=$(gh pr list --head "${BRANCH_NAME}" --json number --jq '.[0].number' 2>/dev/null || true)
 
           if [ -n "${EXISTING}" ]; then
