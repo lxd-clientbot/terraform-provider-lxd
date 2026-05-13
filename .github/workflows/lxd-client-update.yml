@@ -28,7 +28,7 @@ env:
 
 jobs:
   update-client:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-slim
     steps:
       - name: Resolve inputs
         id: inputs
