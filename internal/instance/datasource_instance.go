@@ -201,7 +201,7 @@ func (d *InstanceDataSource) Read(ctx context.Context, req datasource.ReadReques
 	}
 
 	instanceName := state.Name.ValueString()
-	instance, _, err := server.GetInstance(instanceName)
+	instance, _, err := server.GetInstanceInfo(instanceName)
 	if err != nil {
 		resp.Diagnostics.AddError(fmt.Sprintf("Failed to retrieve an existing instance %q", instanceName), err.Error())
 		return

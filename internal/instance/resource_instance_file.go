@@ -199,7 +199,7 @@ func (r InstanceFileResource) Create(ctx context.Context, req resource.CreateReq
 
 	// Ensure instance exists.
 	instanceName := plan.Instance.ValueString()
-	_, _, err = server.GetInstance(instanceName)
+	_, _, err = server.GetInstanceInfo(instanceName)
 	if err != nil {
 		resp.Diagnostics.AddError(fmt.Sprintf("Failed retrieve instance %q", instanceName), err.Error())
 		return
@@ -252,7 +252,7 @@ func (r InstanceFileResource) Read(ctx context.Context, req resource.ReadRequest
 	}
 
 	// Ensure instance exists.
-	instance, _, err := server.GetInstance(instanceName)
+	instance, _, err := server.GetInstanceInfo(instanceName)
 	if err != nil {
 		if errors.IsNotFoundError(err) {
 			// If instance is not found, file cannot exist. Remove it
@@ -313,7 +313,7 @@ func (r InstanceFileResource) Delete(ctx context.Context, req resource.DeleteReq
 	}
 
 	// Ensure instance exists.
-	_, _, err = server.GetInstance(instanceName)
+	_, _, err = server.GetInstanceInfo(instanceName)
 	if err != nil {
 		if errors.IsNotFoundError(err) {
 			return

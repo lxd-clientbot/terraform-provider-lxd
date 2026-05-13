@@ -171,7 +171,7 @@ func (r InstanceDeviceResource) Create(ctx context.Context, req resource.CreateR
 		return
 	}
 
-	instance, etag, err := server.GetInstance(plan.InstanceName.ValueString())
+	instance, etag, err := server.GetInstanceInfo(plan.InstanceName.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError(fmt.Sprintf("Failed to retrieve existing instance %q", plan.InstanceName.ValueString()), err.Error())
 		return
@@ -262,7 +262,7 @@ func (r InstanceDeviceResource) Update(ctx context.Context, req resource.UpdateR
 		return
 	}
 
-	instance, etag, err := server.GetInstance(plan.InstanceName.ValueString())
+	instance, etag, err := server.GetInstanceInfo(plan.InstanceName.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError(fmt.Sprintf("Failed to retrieve existing instance %q", plan.InstanceName.ValueString()), err.Error())
 		return
@@ -336,7 +336,7 @@ func (r InstanceDeviceResource) Delete(ctx context.Context, req resource.DeleteR
 	instanceName := state.InstanceName.ValueString()
 	deviceName := state.Name.ValueString()
 
-	instance, etag, err := server.GetInstance(instanceName)
+	instance, etag, err := server.GetInstanceInfo(instanceName)
 	if err != nil {
 		resp.Diagnostics.AddError(fmt.Sprintf("Failed to retrieve existing instance %q", state.InstanceName.ValueString()), err.Error())
 		return
@@ -381,7 +381,7 @@ func (r InstanceDeviceResource) SyncState(ctx context.Context, tfState *tfsdk.St
 	var respDiags diag.Diagnostics
 
 	instanceName := m.InstanceName.ValueString()
-	instance, _, err := server.GetInstance(instanceName)
+	instance, _, err := server.GetInstanceInfo(instanceName)
 	if err != nil {
 		if errors.IsNotFoundError(err) {
 			tfState.RemoveResource(ctx)

@@ -948,7 +948,7 @@ func (r InstanceResource) Update(ctx context.Context, req resource.UpdateRequest
 	}
 
 	// Get instance.
-	instance, etag, err := server.GetInstance(instanceName)
+	instance, etag, err := server.GetInstanceInfo(instanceName)
 	if err != nil {
 		resp.Diagnostics.AddError(fmt.Sprintf("Failed to retrieve existing instance %q", instanceName), err.Error())
 		return
@@ -1037,7 +1037,7 @@ func (r InstanceResource) Update(ctx context.Context, req resource.UpdateRequest
 			}
 
 			// Refresh instance data and etag after stop.
-			instance, etag, err = server.GetInstance(instanceName)
+			instance, etag, err = server.GetInstanceInfo(instanceName)
 			if err != nil {
 				resp.Diagnostics.AddError(fmt.Sprintf("Failed to retrieve existing instance %q", instanceName), err.Error())
 				return
@@ -1282,7 +1282,7 @@ func (r InstanceResource) SyncState(ctx context.Context, tfState *tfsdk.State, s
 	var respDiags diag.Diagnostics
 
 	instanceName := m.Name.ValueString()
-	instance, _, err := server.GetInstance(instanceName)
+	instance, _, err := server.GetInstanceInfo(instanceName)
 	if err != nil {
 		if errors.IsNotFoundError(err) {
 			tfState.RemoveResource(ctx)
@@ -1704,7 +1704,7 @@ func waitForInstanceNetwork(ctx context.Context, server lxd.InstanceServer, inst
 	// "user.access_interface" to match the behavior of ipv4/ipv6_address
 	// attribute reporting.
 	if nic == "" {
-		inst, _, err := server.GetInstance(instanceName)
+		inst, _, err := server.GetInstanceInfo(instanceName)
 		if err == nil {
 			accIface, ok := inst.ExpandedConfig["user.access_interface"]
 			if ok {
